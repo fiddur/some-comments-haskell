@@ -15,7 +15,6 @@ main = do
       evt = createEvent "testing" Nothing (withJson js)
 
   fork $ forever $ do
-    line <- getLine
     (_ :: ByteString) <- getLine
     sendEvent con "strim" anyVersion evt
 
