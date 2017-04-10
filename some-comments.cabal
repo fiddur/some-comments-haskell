@@ -25,6 +25,9 @@ executable some-comments-exe
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , some-comments
+                     , eventstore
+                     , classy-prelude
+                     , aeson
   default-language:    Haskell2010
 
 test-suite some-comments-test
