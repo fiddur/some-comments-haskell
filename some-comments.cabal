@@ -30,6 +30,7 @@ executable some-comments-exe
                      , aeson
                      , async
                      , yesod
+                     , bytestring
   default-language:    Haskell2010
 
 test-suite some-comments-test

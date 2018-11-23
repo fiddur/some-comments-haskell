@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies              #-}
 import Yesod
 import Data.Aeson
+import Data.Maybe (catMaybes)
 import Database.EventStore
 import Control.Concurrent.Async
 
@@ -16,12 +17,22 @@ mkYesod "HelloWorld" [parseRoutes|
 
 instance Yesod HelloWorld
 
-getEventsR :: Handler Value
-getEventsR = returnJson $ liftIO $ do
+getLanguageEvents :: [ResolvedEvent]
+getLanguageEvents = do
   -- TODO: Should connect in main and pass the connection...
   eventstore <- connect defaultSettings (Static "127.0.0.1" 1113)
-  events <- readStreamEventsForward eventstore "languages" 0 100 False
-  wait events
+  rs <- readStreamEventsForward eventstore "languages" 0 100 False >>= waitAsync
+  case rs of
+    ReadSuccess sl -> do
+      -- let events = catMaybes $ fmap resolvedEventDataAsJson $ sliceEvents sl
+      sliceEvents sl
+    e -> error $ "Read failure: " ++ show e
+
+getEventsR :: Handler Value
+getEventsR = do
+  events <- liftIO getLanguageEvents
+  returnJson events
+
 
 main :: IO ()
 main = do

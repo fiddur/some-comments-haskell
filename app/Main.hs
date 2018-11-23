@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE QuasiQuotes               #-}
@@ -15,6 +16,9 @@ import Data.Aeson
 import Data.Maybe (catMaybes)
 import Database.EventStore
 import Control.Concurrent.Async
+
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Lazy as B
 
 {- 
 
@@ -65,22 +69,73 @@ mkYesod "HelloWorld" [parseRoutes|
 
 instance Yesod HelloWorld
 
-getLanguageEvents :: [ResolvedEvent]
-getLanguageEvents = do
-  -- TODO: Should connect in main and pass the connection...
-  eventstore <- connect defaultSettings (Static "127.0.0.1" 1113)
-  rs <- readStreamEventsForward eventstore "languages" 0 100 False >>= waitAsync
+getConnection :: IO Connection
+getConnection = 
+  connect defaultSettings (Static "127.0.0.1" 1113)
+
+myStreamResult :: IO (Async (ReadResult 'RegularStream StreamSlice))
+myStreamResult = do
+  conn <- getConnection
+  readStreamEventsForward conn "languages" 0 100 False
+
+-- myStreamResultLifted =
+--   liftIO myStreamResult
+
+myStreamResultAwaited :: IO (ReadResult 'RegularStream StreamSlice)
+myStreamResultAwaited = 
+  myStreamResult >>= waitAsync
+
+-- myLanguageEvents = do
+--   rs <- myStreamResultAwaited
+--   case rs of
+--     ReadSuccess sl -> do
+--       sliceEvents sl
+--     e -> error $ "Read failure: " ++ show e
+
+-- myReadEvents = do
+--   conn <- connect defaultSettings (Static "127.0.0.1" 1113)
+--   events <- readStreamEventsForward conn "languages" 0 100 False >>= waitAsync
+--   events
+
+myStreamEvents :: IO [ResolvedEvent]
+myStreamEvents = do
+  rs <- myStreamResultAwaited
   case rs of
     ReadSuccess sl -> do
-      -- let events = catMaybes $ fmap resolvedEventDataAsJson $ sliceEvents sl
-      sliceEvents sl
-    e -> error $ "Read failure: " ++ show e
+      let slice = sliceEvents sl
+      return slice
+      -- return sliceEvents sl
+    e -> return []
+
+
+myStreamEventsDataHead :: IO ResolvedEvent
+myStreamEventsDataHead = do
+  evts <- myStreamEvents
+  return $ head evts
+
+myStreamEventsJson :: IO [ByteString]
+myStreamEventsJson = do
+  evts <- myStreamEvents
+  return $ fmap (recordedEventData . resolvedEventOriginal) evts 
+
+-- getLanguageEvents :: [ResolvedEvent]
+-- getLanguageEvents = do
+--   -- TODO: Should connect in main and pass the connection...
+--   eventstore <- connect defaultSettings (Static "127.0.0.1" 1113)
+--   rs <- readStreamEventsForward eventstore "languages" 0 100 False >>= waitAsync
+--   case rs of
+--     ReadSuccess sl -> do
+--       let events = catMaybes $ fmap resolvedEventDataAsJson $ sliceEvents sl
+--       head events
+--       -- head sliceEvents sl
+--     e -> error $ "Read failure: " ++ show e
 
 getEventsR :: Handler Value
 getEventsR = do
-  events <- liftIO getLanguageEvents
-  return events
-
+  -- events <- liftIO getLanguageEvents
+  -- events <- getLanguageEvents
+  foo <- liftIO getLine
+  returnJson foo
 
 main :: IO ()
 main = do
